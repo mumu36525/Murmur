@@ -1,0 +1,62 @@
+# assistant_bot.py
+from simple_chatbot import SimpleChatBot
+from advanced_analyzer import FileAnalyzer  # 假设你之前创建了这个类
+import os
+
+class AssistantBot(SimpleChatBot):
+    def __init__(self):
+        super().__init__()
+        self.analyzer = FileAnalyzer()
+        
+        # 添加文件相关的对话规则
+        self.responses.update({
+            r".*(分析|处理|查看|读取)(文件|文档|文本).*": [
+                "我可以帮你分析文件。请告诉我文件的完整路径。",
+                "当然可以分析文件。请提供文件路径。"
+            ],
+            r".*文件路径是.*|.*路径.*": [
+                "收到，我会分析这个文件。请稍等...",
+                "好的，让我来处理这个文件。"
+            ]
+        })
+    
+    def respond(self, user_input):
+        # 首先检查是否是文件操作相关
+        if re.search(r".*(分析|处理|查看|读取)(文件|文档|文本).*", user_input.lower()):
+            return "我可以帮你分析文件。请告诉我文件的完整路径。"
+        
+        # 检查是否包含文件路径
+        file_match = re.search(r"[a-zA-Z]:\\(?:[^\\]+\\)*[^\\]+|/(?:[^/]+/)*[^/]+", user_input)
+        if file_match and os.path.exists(file_match.group()):
+            file_path = file_match.group()
+            return self.analyze_file_response(file_path)
+        
+        # 否则使用父类的回应逻辑
+        return super().respond(user_input)
+    
+    def analyze_file_response(self, file_path):
+        """分析文件并生成回应"""
+        try:
+            results = self.analyzer.analyze_file(file_path)
+            if not results:
+                return "抱歉，我无法读取这个文件。请检查路径是否正确。"
+            
+            # 根据分析结果构建回应
+            response = f"我已经分析了文件 {os.path.basename(file_path)}:\n"
+            response += f"- 情感倾向: {results['sentiment']['label']} (置信度: {results['sentiment']['score']:.2f})\n"
+            response += f"- 主要主题: {results['topics']['labels'][0]} (置信度: {results['topics']['scores'][0]:.2f})\n"
+            response += f"- 文本长度: {results['stats']['word_count']} 个单词\n"
+            response += f"\n摘要:\n{results['summary']}"
+            
+            return response
+        except Exception as e:
+            return f"分析文件时出错: {str(e)}"
+
+# 运行助手机器人
+if __name__ == "__main__":
+    bot = AssistantBot()
+    print("助手机器人已启动! 我可以帮你分析文件或与你聊天。")
+    print("尝试说 '帮我分析这个文件: C:/path/to/your/file.txt'")
+    print("输入'退出'或'再见'来结束对话。")
+    print("=" * 50)
+    bot.chat()
